@@ -1,4 +1,3 @@
-// backend/src/index.js
 import express from "express";
 import dotenv from "dotenv";
 import path from "path";
@@ -15,10 +14,42 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 const app = express();
 app.use(express.json());
 
-// ✅ Secure CORS for production (Vercel frontend)
-app.use(cors({
-  origin: FRONTEND_URL,
-  credentials: true
+// --- CORS: allow both deployed frontend and local dev (preflight handled) ---
+const allowedOrigins = [
+  FRONTEND_URL,
+  "http://localhost:5173", // local dev (vite)
+];
+
+app.use((req, res, next) => {
+  // handle preflight quickly
+  const origin = req.headers.origin;
+  if (!origin) {
+    // no origin (server-to-server or curl), allow
+    res.header("Access-Control-Allow-Origin", "*");
+  } else if (allowedOrigins.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+  } else {
+    // not allowed origin — do not set ACAO header
+    // let CORS middleware/your code reject it later if needed
+  }
+
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Methods", "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+  next();
+});
+
+// ensure OPTIONS preflight requests are handled
+app.options("*", cors({
+  origin: (origin, cb) => {
+    // allow no-origin requests (curl / server)
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
 }));
 
 // ✅ Health check for Render monitoring
@@ -59,6 +90,7 @@ async function start() {
 
     app.listen(PORT, () => {
       console.log(`🚀 Backend running on port ${PORT}`);
+      console.log(`=> FRONTEND_URL: ${FRONTEND_URL}`);
     });
 
   } catch (err) {
