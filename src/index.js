@@ -40,7 +40,7 @@ app.use((req, res, next) => {
 });
 
 // ensure OPTIONS preflight requests are handled
-app.options("*", cors({
+app.options("/*", cors({
   origin: (origin, cb) => {
     // allow no-origin requests (curl / server)
     if (!origin) return cb(null, true);
@@ -48,9 +48,10 @@ app.options("*", cors({
     return cb(new Error("Not allowed by CORS"));
   },
   credentials: true,
-  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+  methods: ["GET","HEAD","PUT","PATCH","POST","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type","Authorization","X-Requested-With"]
 }));
+
 
 // ✅ Health check for Render monitoring
 app.get("/health", (req, res) => {
