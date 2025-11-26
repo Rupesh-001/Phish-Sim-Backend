@@ -9,63 +9,53 @@ dotenv.config();
 const PORT = process.env.PORT || 4000;
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.DB_NAME || "phish_sim";
+
+// Important → this must match your Vercel domain
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
 const app = express();
 app.use(express.json());
 
-// --- CORS: allow both deployed frontend and local dev (preflight handled) ---
+// -----------------------------
+// ✅ CORS (safe for Express 5 + Render)
+// -----------------------------
 const allowedOrigins = [
-  FRONTEND_URL,
-  "http://localhost:5173", // local dev (vite)
+  FRONTEND_URL,           // e.g. https://phish-sim-frontend.vercel.app
+  "http://localhost:5173" // local dev (Vite)
 ];
 
-app.use((req, res, next) => {
-  // handle preflight quickly
-  const origin = req.headers.origin;
-  if (!origin) {
-    // no origin (server-to-server or curl), allow
-    res.header("Access-Control-Allow-Origin", "*");
-  } else if (allowedOrigins.includes(origin)) {
-    res.header("Access-Control-Allow-Origin", origin);
-  } else {
-    // not allowed origin — do not set ACAO header
-    // let CORS middleware/your code reject it later if needed
-  }
+app.use(
+  cors({
+    origin(origin, cb) {
+      // allow no-origin (curl, server)
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error("Not allowed by CORS"), false);
+    },
+    credentials: true,
+    methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  })
+);
 
-  res.header("Access-Control-Allow-Credentials", "true");
-  res.header("Access-Control-Allow-Methods", "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
-  next();
-});
-
-// ensure OPTIONS preflight requests are handled
-app.options("/*", cors({
-  origin: (origin, cb) => {
-    // allow no-origin requests (curl / server)
-    if (!origin) return cb(null, true);
-    if (allowedOrigins.includes(origin)) return cb(null, true);
-    return cb(new Error("Not allowed by CORS"));
-  },
-  credentials: true,
-  methods: ["GET","HEAD","PUT","PATCH","POST","DELETE","OPTIONS"],
-  allowedHeaders: ["Content-Type","Authorization","X-Requested-With"]
-}));
-
-
-// ✅ Health check for Render monitoring
+// -----------------------------
+// Health Check (Render needs this)
+// -----------------------------
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "Backend is running ✅" });
 });
 
-// serve public static (images, invoices, certificates)
+// -----------------------------
+// Static assets
+// -----------------------------
 app.use("/images", express.static(path.join(process.cwd(), "public", "images")));
 app.use("/invoices", express.static(path.join(process.cwd(), "public", "invoices")));
 app.use("/certificates", express.static(path.join(process.cwd(), "public", "certificates")));
 app.use(express.static("public"));
 
-
-// --- Routes ---
+// -----------------------------
+// Routes
+// -----------------------------
 import challengesRouter from "./routes/challenges.js";
 import attemptsRouter from "./routes/attempts.js";
 import authRouter from "./routes/auth.js";
@@ -80,7 +70,9 @@ app.use("/api/profile", profileRouter);
 app.use("/api/certificates", certificatesRouter);
 app.use("/api/leaderboard", leaderboardRouter);
 
-// ✅ Database connection
+// -----------------------------
+// Database + Server Start
+// -----------------------------
 async function start() {
   try {
     const client = new MongoClient(MONGODB_URI);
@@ -91,7 +83,7 @@ async function start() {
 
     app.listen(PORT, () => {
       console.log(`🚀 Backend running on port ${PORT}`);
-      console.log(`=> FRONTEND_URL: ${FRONTEND_URL}`);
+      console.log(`🔗 Allowed frontend: ${FRONTEND_URL}`);
     });
 
   } catch (err) {
